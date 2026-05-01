@@ -1,144 +1,126 @@
 const Booking = require('../models/Booking');
 
-const getAvailableSlots = async (req, res) => {
+const MAX_BOARDING_CAPACITY = 10;
+
+// GET /bookings/boarding/available?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
+const getBoardingAvailability = async (req, res) => {
   try {
-    const { date } = req.query;
-    if (!date) return res.status(400).json({ message: 'Date is required' });
-
-    const searchDate = new Date(date);
-    const startOfDay = new Date(searchDate);
-    startOfDay.setUTCHours(0, 0, 0, 0);
-    const endOfDay = new Date(searchDate);
-    endOfDay.setUTCHours(23, 59, 59, 999);
-
-    const standardSlots = ["09:00", "10:00", "11:00", "13:00", "14:00", "15:00"];
-
-    const existingBookings = await Booking.find({
-      serviceType: 'Boarding',
-      appointmentDate: { $gte: startOfDay, $lte: endOfDay }
-    });
-
-    // A slot is occupied when:
-    //  - status is Approved or Rejected (final states), OR
-    //  - status is Pending AND petId is set (booking confirmed, awaiting boarding approval), OR
-    //  - status is Pending AND lockedUntil is still in the future (active TTL lock)
-    const activeBookings = existingBookings.filter(b => {
-      if (b.status === 'Cancelled') return false;        // cancelled → free
-      if (b.status !== 'Pending')   return true;         // Approved/Rejected → occupied
-      if (b.petId)                  return true;         // confirmed booking → occupied
-      return b.lockedUntil && b.lockedUntil > Date.now(); // live TTL lock → occupied
-    });
-
-    const bookedOrLockedSlots = activeBookings.map(b => b.timeSlot);
-    
-    const availableSlots = standardSlots
-      .filter(slot => !bookedOrLockedSlots.includes(slot))
-      .map(slot => ({
-        time: slot
-      }));
-
-    res.status(200).json(availableSlots);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-const lockSlot = async (req, res) => {
-  try {
-    const { date, timeSlot } = req.body;
-    if (!date || !timeSlot) return res.status(400).json({ message: 'Date and timeSlot are required' });
-
-    const appointmentDate = new Date(date);
-    const startOfDay = new Date(appointmentDate);
-    startOfDay.setUTCHours(0, 0, 0, 0);
-    const endOfDay = new Date(appointmentDate);
-    endOfDay.setUTCHours(23, 59, 59, 999);
-
-    const existingBooking = await Booking.findOne({
-      serviceType: 'Boarding',
-      appointmentDate: { $gte: startOfDay, $lte: endOfDay },
-      timeSlot,
-      $or: [
-        { status: { $ne: 'Cancelled' } },
-        { lockedUntil: { $gt: Date.now() } }
-      ]
-    });
-
-    if (existingBooking) return res.status(400).json({ message: 'Slot is already booked or locked' });
-
-    const lockedUntil = new Date(Date.now() + 5 * 60 * 1000);
-    const newBooking = await Booking.create({
-      userId: req.user._id,
-      serviceType: 'Boarding',
-      appointmentDate,
-      timeSlot,
-      lockedUntil,
-      status: 'Pending'
-    });
-
-    res.status(201).json({ bookingId: newBooking._id });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-const confirmBooking = async (req, res) => {
-  try {
-    const { bookingId, petId } = req.body;
-    if (!bookingId || !petId) return res.status(400).json({ message: 'bookingId and petId are required' });
-
-    const booking = await Booking.findById(bookingId);
-    if (!booking) return res.status(404).json({ message: 'Booking not found' });
-    if (booking.userId.toString() !== req.user._id.toString()) return res.status(403).json({ message: 'Unauthorized' });
-
-    if (booking.lockedUntil && new Date(booking.lockedUntil) < new Date()) {
-      return res.status(400).json({ message: 'Lock expired' });
+    const { startDate, endDate } = req.query;
+    if (!startDate || !endDate) {
+      return res.status(400).json({ message: 'startDate and endDate are required' });
     }
 
-    booking.petId = petId;
-    booking.lockedUntil = undefined;
-    booking.status = 'Pending';
-    // Removed isInstantSlot assignment to preserve its state
-    await booking.save();
+    const start = new Date(startDate);
+    start.setUTCHours(0, 0, 0, 0);
+    const end = new Date(endDate);
+    end.setUTCHours(23, 59, 59, 999);
+
+    // Find all approved bookings that overlap this date range
+    const existingBookings = await Booking.find({
+      serviceType: 'Boarding',
+      status: 'Approved',
+      boardingDates: { $elemMatch: { $gte: start, $lte: end } },
+    });
+
+    // Build a count map: { 'YYYY-MM-DD': count }
+    const capacityMap = {};
+    existingBookings.forEach(booking => {
+      if (booking.boardingDates) {
+        booking.boardingDates.forEach(date => {
+          const d = new Date(date);
+          if (d >= start && d <= end) {
+            const dateStr = d.toISOString().split('T')[0];
+            capacityMap[dateStr] = (capacityMap[dateStr] || 0) + 1;
+          }
+        });
+      }
+    });
+
+    // Build a result array for each day in the range
+    const result = [];
+    const current = new Date(start);
+    while (current <= end) {
+      const dateStr = current.toISOString().split('T')[0];
+      const count = capacityMap[dateStr] || 0;
+      result.push({
+        date: dateStr,
+        status: count >= MAX_BOARDING_CAPACITY ? 'full' : 'available',
+        count,
+      });
+      current.setDate(current.getDate() + 1);
+    }
+
+    res.status(200).json(result);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// POST /bookings/boarding/book
+const createBoardingBooking = async (req, res) => {
+  try {
+    const { petId, boardingDates } = req.body;
+    if (!petId || !boardingDates || !boardingDates.length) {
+      return res.status(400).json({ message: 'petId and boardingDates array are required' });
+    }
+
+    const parsedDates = boardingDates.map(d => {
+      const date = new Date(d);
+      date.setUTCHours(12, 0, 0, 0); // noon UTC avoids timezone boundary issues
+      return date;
+    });
+
+    const newBooking = await Booking.create({
+      userId: req.user._id,
+      petId,
+      serviceType: 'Boarding',
+      boardingDates: parsedDates,
+      status: 'Pending',
+      appointmentDate: parsedDates[0], // kept for backward compat
+      timeSlot: 'N/A',
+    });
 
     const { sendNotification } = require('../utils/notificationService');
     sendNotification(
-      booking.userId,
-      'Booking Confirmed',
-      `Your Boarding appointment on ${new Date(booking.appointmentDate).toLocaleDateString('en-US', { timeZone: 'UTC' })} at ${booking.timeSlot} is confirmed and pending approval.`
+      newBooking.userId,
+      'Boarding Request Received',
+      `Your Boarding request for ${parsedDates.length} day(s) has been received and is pending approval.`
     );
 
-    res.status(200).json({ message: 'Booking confirmed', booking });
+    res.status(201).json({ message: 'Booking created', booking: newBooking });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
+// DELETE /bookings/boarding/:id
 const cancelBooking = async (req, res) => {
   try {
     const { id } = req.params;
     const booking = await Booking.findById(id);
     if (!booking) return res.status(404).json({ message: 'Booking not found' });
-    if (booking.userId.toString() !== req.user._id.toString()) return res.status(403).json({ message: 'Unauthorized' });
+    if (booking.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Unauthorized' });
+    }
 
-    const [hours, minutes] = booking.timeSlot.split(':');
-    const appointmentTime = new Date(booking.appointmentDate);
-    appointmentTime.setUTCHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+    // For boarding, check if the first day has already started
+    const firstDay = booking.boardingDates && booking.boardingDates.length > 0
+      ? new Date(booking.boardingDates[0])
+      : new Date(booking.appointmentDate);
 
-    const diffInMilliseconds = appointmentTime - new Date();
-    if (diffInMilliseconds < 2 * 60 * 60 * 1000) {
-      return res.status(400).json({ message: 'Cannot cancel within 2 hours' });
+    firstDay.setUTCHours(0, 0, 0, 0);
+    if (firstDay - new Date() < 0) {
+      return res.status(400).json({ message: 'Cannot cancel an ongoing or past boarding stay' });
     }
 
     booking.status = 'Cancelled';
-    booking.lockedUntil = undefined;
     await booking.save();
 
     const { sendNotification } = require('../utils/notificationService');
     sendNotification(
       booking.userId,
-      'Booking Cancelled',
-      `Your Boarding appointment on ${new Date(booking.appointmentDate).toLocaleDateString('en-US', { timeZone: 'UTC' })} at ${booking.timeSlot} has been cancelled.`
+      'Boarding Cancelled',
+      `Your Boarding request has been cancelled.`
     );
 
     res.status(200).json({ message: 'Booking cancelled successfully' });
@@ -147,31 +129,58 @@ const cancelBooking = async (req, res) => {
   }
 };
 
+// GET /bookings/boarding  (BoardingManager / Admin only)
 const getAllBoardingBookings = async (req, res) => {
   try {
     const bookings = await Booking.find({ serviceType: 'Boarding' })
-      .populate('petId')
-      .populate('userId');
+      .populate('petId', 'name species')
+      .populate('userId', 'name email');
     res.status(200).json(bookings);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
+// PUT /bookings/boarding/:id/status  (BoardingManager / Admin only)
 const updateBookingStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
     const booking = await Booking.findById(id);
     if (!booking) return res.status(404).json({ message: 'Booking not found' });
+
+    // Capacity check before approving
+    if (status === 'Approved' && booking.boardingDates && booking.boardingDates.length > 0) {
+      for (const date of booking.boardingDates) {
+        const startOfDay = new Date(date);
+        startOfDay.setUTCHours(0, 0, 0, 0);
+        const endOfDay = new Date(date);
+        endOfDay.setUTCHours(23, 59, 59, 999);
+
+        const dailyApprovedCount = await Booking.countDocuments({
+          serviceType: 'Boarding',
+          status: 'Approved',
+          _id: { $ne: id }, // exclude this booking itself
+          boardingDates: { $elemMatch: { $gte: startOfDay, $lte: endOfDay } },
+        });
+
+        if (dailyApprovedCount >= MAX_BOARDING_CAPACITY) {
+          const dateStr = startOfDay.toISOString().split('T')[0];
+          return res.status(400).json({
+            message: `Cannot approve: Boarding house is full on ${dateStr} (max ${MAX_BOARDING_CAPACITY} pets/day)`,
+          });
+        }
+      }
+    }
+
     booking.status = status;
     await booking.save();
 
     const { sendNotification } = require('../utils/notificationService');
     sendNotification(
       booking.userId,
-      `Booking ${status}`,
-      `Your Boarding appointment on ${new Date(booking.appointmentDate).toLocaleDateString('en-US', { timeZone: 'UTC' })} at ${booking.timeSlot} has been ${status.toLowerCase()}.`
+      `Boarding ${status}`,
+      `Your Boarding request has been ${status.toLowerCase()}.`
     );
 
     res.status(200).json(booking);
@@ -180,4 +189,10 @@ const updateBookingStatus = async (req, res) => {
   }
 };
 
-module.exports = { getAvailableSlots, lockSlot, confirmBooking, cancelBooking, getAllBoardingBookings, updateBookingStatus };
+module.exports = {
+  getBoardingAvailability,
+  createBoardingBooking,
+  cancelBooking,
+  getAllBoardingBookings,
+  updateBookingStatus,
+};
