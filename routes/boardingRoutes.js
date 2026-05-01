@@ -1,6 +1,7 @@
 const express = require('express');
 const {
   getBoardingAvailability,
+  getPetBookedDates,
   createBoardingBooking,
   cancelBooking,
   getAllBoardingBookings,
@@ -18,6 +19,7 @@ router.put('/:id/status', authorizeRoles('BoardingManager', 'Admin'), updateBook
 
 // User routes
 router.get('/available', getBoardingAvailability);
+router.get('/pet-dates', getPetBookedDates);
 router.post('/book', createBoardingBooking);
 router.delete('/:id', cancelBooking);
 

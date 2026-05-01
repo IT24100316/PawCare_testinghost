@@ -1,6 +1,6 @@
 const Booking = require('../models/Booking');
 
-const MAX_BOARDING_CAPACITY = 10;
+const MAX_BOARDING_CAPACITY = 20;
 
 // GET /bookings/boarding/available?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
 const getBoardingAvailability = async (req, res) => {
@@ -70,6 +70,28 @@ const createBoardingBooking = async (req, res) => {
       return date;
     });
 
+    // ── Duplicate check: same pet cannot book dates it already has (Pending or Approved) ──
+    for (const date of parsedDates) {
+      const startOfDay = new Date(date);
+      startOfDay.setUTCHours(0, 0, 0, 0);
+      const endOfDay = new Date(date);
+      endOfDay.setUTCHours(23, 59, 59, 999);
+
+      const conflict = await Booking.findOne({
+        petId,
+        serviceType: 'Boarding',
+        status: { $in: ['Pending', 'Approved'] },
+        boardingDates: { $elemMatch: { $gte: startOfDay, $lte: endOfDay } },
+      });
+
+      if (conflict) {
+        const dateStr = startOfDay.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+        return res.status(400).json({
+          message: `This pet already has a boarding booking on ${dateStr}. Please choose different dates.`,
+        });
+      }
+    }
+
     const newBooking = await Booking.create({
       userId: req.user._id,
       petId,
@@ -92,6 +114,7 @@ const createBoardingBooking = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
 
 // DELETE /bookings/boarding/:id
 const cancelBooking = async (req, res) => {
@@ -189,8 +212,41 @@ const updateBookingStatus = async (req, res) => {
   }
 };
 
+// GET /bookings/boarding/pet-dates?petId=xxx
+// Returns all boardingDates for a given pet that are Pending or Approved
+const getPetBookedDates = async (req, res) => {
+  try {
+    const { petId } = req.query;
+    if (!petId) return res.status(400).json({ message: 'petId is required' });
+
+    const bookings = await Booking.find({
+      petId,
+      serviceType: 'Boarding',
+      status: { $in: ['Pending', 'Approved'] },
+    }).select('boardingDates status');
+
+    // Flatten all dates and tag each with its status
+    const dates = [];
+    bookings.forEach(b => {
+      if (b.boardingDates) {
+        b.boardingDates.forEach(d => {
+          dates.push({
+            date: new Date(d).toISOString().split('T')[0],
+            status: b.status,
+          });
+        });
+      }
+    });
+
+    res.status(200).json(dates);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getBoardingAvailability,
+  getPetBookedDates,
   createBoardingBooking,
   cancelBooking,
   getAllBoardingBookings,
