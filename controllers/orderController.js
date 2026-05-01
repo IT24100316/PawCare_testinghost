@@ -56,11 +56,21 @@ const updateOrderStatus = async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
     
-    const order = await Order.findByIdAndUpdate(id, { status }, { new: true, runValidators: true });
+    const order = await Order.findById(id);
     
     if (!order) {
       return res.status(404).json({ message: 'Order not found' });
     }
+    
+    // Restore stock if the order is being cancelled
+    if ((status === 'Cancelled' || status === 'Rejected') && order.status !== 'Cancelled' && order.status !== 'Rejected') {
+      for (let item of order.items) {
+        await Product.findByIdAndUpdate(item.productId, { $inc: { stock: item.quantity } });
+      }
+    }
+    
+    order.status = status;
+    await order.save();
     
     res.status(200).json(order);
   } catch (error) {
