@@ -105,7 +105,7 @@ const confirmBooking = async (req, res) => {
     sendNotification(
       booking.userId,
       'Booking Confirmed',
-      `Your Grooming appointment on ${new Date(booking.appointmentDate).toLocaleDateString()} at ${booking.timeSlot} is confirmed and pending approval.`
+      `Your Grooming appointment on ${new Date(booking.appointmentDate).toLocaleDateString('en-US', { timeZone: 'UTC' })} at ${booking.timeSlot} is confirmed and pending approval.`
     );
 
     res.status(200).json({ message: 'Booking confirmed', booking });
@@ -138,7 +138,7 @@ const cancelBooking = async (req, res) => {
     sendNotification(
       booking.userId,
       'Booking Cancelled',
-      `Your Grooming appointment on ${new Date(booking.appointmentDate).toLocaleDateString()} at ${booking.timeSlot} has been cancelled.`
+      `Your Grooming appointment on ${new Date(booking.appointmentDate).toLocaleDateString('en-US', { timeZone: 'UTC' })} at ${booking.timeSlot} has been cancelled.`
     );
 
     res.status(200).json({ message: 'Booking cancelled successfully' });
@@ -171,7 +171,7 @@ const updateBookingStatus = async (req, res) => {
     sendNotification(
       booking.userId,
       `Booking ${status}`,
-      `Your Grooming appointment on ${new Date(booking.appointmentDate).toLocaleDateString()} at ${booking.timeSlot} has been ${status.toLowerCase()}.`
+      `Your Grooming appointment on ${new Date(booking.appointmentDate).toLocaleDateString('en-US', { timeZone: 'UTC' })} at ${booking.timeSlot} has been ${status.toLowerCase()}.`
     );
 
     res.status(200).json(booking);
