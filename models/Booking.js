@@ -28,10 +28,7 @@ const bookingSchema = new mongoose.Schema({
     enum: ['Pending', 'Approved', 'Rejected', 'Cancelled'],
     default: 'Pending',
   },
-  isInstantSlot: {
-    type: Boolean,
-    default: false,
-  },
+
   lockedUntil: {
     type: Date,
   },

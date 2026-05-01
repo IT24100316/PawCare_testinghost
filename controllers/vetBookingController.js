@@ -35,14 +35,10 @@ const getAvailableSlots = async (req, res) => {
 
     const bookedOrLockedSlots = activeBookings.map(b => b.timeSlot);
     
-    const cancelledBookings = existingBookings.filter(b => b.status === 'Cancelled');
-    const cancelledSlots = cancelledBookings.map(b => b.timeSlot);
-
     const availableSlots = standardSlots
       .filter(slot => !bookedOrLockedSlots.includes(slot))
       .map(slot => ({
-        time: slot,
-        isInstant: cancelledSlots.includes(slot)
+        time: slot
       }));
 
     res.status(200).json(availableSlots);
@@ -80,13 +76,6 @@ const lockSlot = async (req, res) => {
       return res.status(400).json({ message: 'Slot is already booked or locked' });
     }
 
-    const isInstant = await Booking.findOne({
-      serviceType: 'Vet',
-      appointmentDate: { $gte: startOfDay, $lte: endOfDay },
-      timeSlot,
-      status: 'Cancelled'
-    });
-
     const lockedUntil = new Date(Date.now() + 5 * 60 * 1000);
 
     const newBooking = await Booking.create({
@@ -95,8 +84,7 @@ const lockSlot = async (req, res) => {
       appointmentDate,
       timeSlot,
       lockedUntil,
-      status: 'Pending',
-      isInstantSlot: !!isInstant
+      status: 'Pending'
     });
 
     res.status(201).json({ bookingId: newBooking._id });
@@ -130,7 +118,6 @@ const confirmBooking = async (req, res) => {
     booking.petId = petId;
     booking.lockedUntil = undefined;
     booking.status = 'Pending';
-    // Removed isInstantSlot assignment to preserve its state
 
     await booking.save();
 
@@ -160,9 +147,6 @@ const cancelBooking = async (req, res) => {
       return res.status(403).json({ message: 'Unauthorized access to cancel booking' });
     }
 
-    if (booking.isInstantSlot) {
-      return res.status(400).json({ message: 'Cannot cancel instant slots' });
-    }
 
     const [hours, minutes] = booking.timeSlot.split(':');
     const appointmentTime = new Date(booking.appointmentDate);
@@ -177,7 +161,6 @@ const cancelBooking = async (req, res) => {
 
     booking.status = 'Cancelled';
     booking.lockedUntil = undefined;
-    // NOTE: do NOT set isInstantSlot=true here - this corrupts future bookings of same slot
     await booking.save();
 
     const { sendNotification } = require('../utils/notificationService');

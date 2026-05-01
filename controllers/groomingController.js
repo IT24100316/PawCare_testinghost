@@ -31,14 +31,10 @@ const getAvailableSlots = async (req, res) => {
 
     const bookedOrLockedSlots = activeBookings.map(b => b.timeSlot);
     
-    const cancelledBookings = existingBookings.filter(b => b.status === 'Cancelled');
-    const cancelledSlots = cancelledBookings.map(b => b.timeSlot);
-
     const availableSlots = standardSlots
       .filter(slot => !bookedOrLockedSlots.includes(slot))
       .map(slot => ({
-        time: slot,
-        isInstant: cancelledSlots.includes(slot)
+        time: slot
       }));
 
     res.status(200).json(availableSlots);
@@ -70,13 +66,6 @@ const lockSlot = async (req, res) => {
 
     if (existingBooking) return res.status(400).json({ message: 'Slot is already booked or locked' });
 
-    const isInstant = await Booking.findOne({
-      serviceType: 'Grooming',
-      appointmentDate: { $gte: startOfDay, $lte: endOfDay },
-      timeSlot,
-      status: 'Cancelled'
-    });
-
     const lockedUntil = new Date(Date.now() + 5 * 60 * 1000);
     const newBooking = await Booking.create({
       userId: req.user._id,
@@ -84,8 +73,7 @@ const lockSlot = async (req, res) => {
       appointmentDate,
       timeSlot,
       lockedUntil,
-      status: 'Pending',
-      isInstantSlot: !!isInstant
+      status: 'Pending'
     });
 
     res.status(201).json({ bookingId: newBooking._id });
@@ -132,7 +120,6 @@ const cancelBooking = async (req, res) => {
     const booking = await Booking.findById(id);
     if (!booking) return res.status(404).json({ message: 'Booking not found' });
     if (booking.userId.toString() !== req.user._id.toString()) return res.status(403).json({ message: 'Unauthorized' });
-    if (booking.isInstantSlot) return res.status(400).json({ message: 'Cannot cancel instant slots' });
 
     const [hours, minutes] = booking.timeSlot.split(':');
     const appointmentTime = new Date(booking.appointmentDate);
@@ -145,7 +132,6 @@ const cancelBooking = async (req, res) => {
 
     booking.status = 'Cancelled';
     booking.lockedUntil = undefined;
-    booking.isInstantSlot = true;
     await booking.save();
 
     const { sendNotification } = require('../utils/notificationService');
