@@ -1,0 +1,243 @@
+### Test Health Route
+GET http://localhost:5000/api/health
+
+###
+
+### Register a New User
+POST http://localhost:5000/api/auth/register
+Content-Type: application/json
+
+{
+  "name": "Test Vet",
+  "email": "vet@pawcare.com",
+  "password": "password123",
+  "role": "Vet"
+}
+
+###
+
+### Login the User
+POST http://localhost:5000/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "vet@pawcare.com",
+  "password": "password123"
+}
+
+### Add a New Pet
+POST http://localhost:5000/api/pets
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5Y2U0ZmI3MjAyNzBkYmNmZGEyOTcwZCIsInJvbGUiOiJWZXQiLCJpYXQiOjE3NzUxMjg2ODUsImV4cCI6MTc3NTczMzQ4NX0.E_AW5ktH2inAJS7JBl7C0BS87Pq7fwe5OSTWKXY04jQ
+
+{
+  "name": "Rex",
+  "species": "Dog",
+  "breed": "German Shepherd",
+  "age": 3,
+  "medicalNotes": "Allergic to chicken"
+}
+
+###
+
+### Get My Pets
+GET http://localhost:5000/api/pets
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5Y2U0ZmI3MjAyNzBkYmNmZGEyOTcwZCIsInJvbGUiOiJWZXQiLCJpYXQiOjE3NzUxMjg2ODUsImV4cCI6MTc3NTczMzQ4NX0.E_AW5ktH2inAJS7JBl7C0BS87Pq7fwe5OSTWKXY04jQ
+
+
+
+### 1. Check Available Slots for Tomorrow
+GET http://localhost:5000/api/bookings/vet/available?date=2026-04-03
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5Y2U0ZmI3MjAyNzBkYmNmZGEyOTcwZCIsInJvbGUiOiJWZXQiLCJpYXQiOjE3NzUxMjg2ODUsImV4cCI6MTc3NTczMzQ4NX0.E_AW5ktH2inAJS7JBl7C0BS87Pq7fwe5OSTWKXY04jQ
+
+###
+
+### 2. Lock a Slot (This should create a temporary booking)
+POST http://localhost:5000/api/bookings/vet/lock
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5Y2U0ZmI3MjAyNzBkYmNmZGEyOTcwZCIsInJvbGUiOiJWZXQiLCJpYXQiOjE3NzUxMjg2ODUsImV4cCI6MTc3NTczMzQ4NX0.E_AW5ktH2inAJS7JBl7C0BS87Pq7fwe5OSTWKXY04jQ
+
+{
+  "date": "2026-04-03",
+  "timeSlot": "11:00"
+}
+
+###
+
+### 3. Check Available Slots Again (10:00 should now be MISSING)
+GET http://localhost:5000/api/bookings/vet/available?date=2026-04-03
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5Y2U0ZmI3MjAyNzBkYmNmZGEyOTcwZCIsInJvbGUiOiJWZXQiLCJpYXQiOjE3NzUxMjg2ODUsImV4cCI6MTc3NTczMzQ4NX0.E_AW5ktH2inAJS7JBl7C0BS87Pq7fwe5OSTWKXY04jQ
+
+###
+
+### 4. Confirm the Booking (Finalize it with Rex's ID)
+# REPLACE <NEW_BOOKING_ID> with the _id returned from Step 2
+POST http://localhost:5000/api/bookings/vet/confirm
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5Y2U0ZmI3MjAyNzBkYmNmZGEyOTcwZCIsInJvbGUiOiJWZXQiLCJpYXQiOjE3NzUxMjg2ODUsImV4cCI6MTc3NTczMzQ4NX0.E_AW5ktH2inAJS7JBl7C0BS87Pq7fwe5OSTWKXY04jQ
+
+{
+  "bookingId": "69ce52a63fd335e2542355d5",
+  "petId": "69ce51ec3fd335e2542355c3"
+}
+
+
+
+
+### 1. Register a Shop Owner
+POST http://localhost:5000/api/auth/register
+Content-Type: application/json
+
+{
+  "name": "Shop Manager",
+  "email": "shop@pawcare.com",
+  "password": "password123",
+  "role": "ShopOwner"
+}
+
+### 2. Add a Product
+# REPLACE <SHOP_OWNER_TOKEN> with the token from Step 1
+POST http://localhost:5000/api/products
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5Y2U1NWIzN2RkOGI0NDk5Y2FlNmI4NiIsInJvbGUiOiJTaG9wT3duZXIiLCJpYXQiOjE3NzUxMzAwMzUsImV4cCI6MTc3NTczNDgzNX0.tlH7w3Febca2OAx6t_jFejV_DSSDjckKR-Qk10p8dv0
+
+{
+  "name": "Premium Dog Food",
+  "category": "Food",
+  "price": 45.99,
+  "stock": 100,
+  "imageUrl": "https://example.com/dogfood.jpg"
+}
+
+### 3. Get All Products (Any logged-in user can do this)
+# You can use your Vet token or Shop Owner token here
+GET http://localhost:5000/api/products
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5Y2U1NWIzN2RkOGI0NDk5Y2FlNmI4NiIsInJvbGUiOiJTaG9wT3duZXIiLCJpYXQiOjE3NzUxMzAwMzUsImV4cCI6MTc3NTczNDgzNX0.tlH7w3Febca2OAx6t_jFejV_DSSDjckKR-Qk10p8dv0
+
+
+### 1. Submit a 5-Star Vet Review
+POST http://localhost:5000/api/feedbacks
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5Y2U0ZmI3MjAyNzBkYmNmZGEyOTcwZCIsInJvbGUiOiJWZXQiLCJpYXQiOjE3NzUxMzAyMjQsImV4cCI6MTc3NTczNTAyNH0.Gvq0aV1wZmokSQOnFnSoN5OSqJmQxq7pfo0hAS5LCIk
+
+{
+  "serviceType": "Vet",
+  "rating": 5,
+  "comment": "The vet was amazing with Rex!"
+}
+
+### 2. Submit a 4-Star Vet Review
+POST http://localhost:5000/api/feedbacks
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5Y2U0ZmI3MjAyNzBkYmNmZGEyOTcwZCIsInJvbGUiOiJWZXQiLCJpYXQiOjE3NzUxMzAyMjQsImV4cCI6MTc3NTczNTAyNH0.Gvq0aV1wZmokSQOnFnSoN5OSqJmQxq7pfo0hAS5LCIk
+
+{
+  "serviceType": "Vet",
+  "rating": 4,
+  "comment": "Good service, but a little wait time."
+}
+
+### 3. Check the Average Ratings (MongoDB Aggregation)
+GET http://localhost:5000/api/feedbacks/average
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5Y2U0ZmI3MjAyNzBkYmNmZGEyOTcwZCIsInJvbGUiOiJWZXQiLCJpYXQiOjE3NzUxMzAyMjQsImV4cCI6MTc3NTczNTAyNH0.Gvq0aV1wZmokSQOnFnSoN5OSqJmQxq7pfo0hAS5LCIk
+
+
+### Add a Medical Record for Rex
+POST http://localhost:5000/api/medical-records
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5Y2U0ZmI3MjAyNzBkYmNmZGEyOTcwZCIsInJvbGUiOiJWZXQiLCJpYXQiOjE3NzUxMzAyMjQsImV4cCI6MTc3NTczNTAyNH0.Gvq0aV1wZmokSQOnFnSoN5OSqJmQxq7pfo0hAS5LCIk
+
+{
+  "petId": "69ce51ec3fd335e2542355c3",
+  "vaccineName": "Rabies",
+  "dateGiven": "2026-04-02",
+  "nextDueDate": "2027-04-02",
+  "doctorNotes": "Rex was a brave boy."
+}
+
+### Get Rex's Medical Records
+GET http://localhost:5000/api/medical-records/pet/69ce51ec3fd335e2542355c3
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5Y2U0ZmI3MjAyNzBkYmNmZGEyOTcwZCIsInJvbGUiOiJWZXQiLCJpYXQiOjE3NzUxMzAyMjQsImV4cCI6MTc3NTczNTAyNH0.Gvq0aV1wZmokSQOnFnSoN5OSqJmQxq7pfo0hAS5LCIk
+
+
+
+### Upload an Image
+POST http://localhost:5000/api/upload/image
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5Y2U0ZmI3MjAyNzBkYmNmZGEyOTcwZCIsInJvbGUiOiJWZXQiLCJpYXQiOjE3NzUxMzAyMjQsImV4cCI6MTc3NTczNTAyNH0.Gvq0aV1wZmokSQOnFnSoN5OSqJmQxq7pfo0hAS5LCIk
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="image"; filename="test_image.jpg"
+Content-Type: image/jpeg
+
+< D:\Y2S2\WMT\pawcare\pictures\dog-hero.jpg
+--WebAppBoundary--
+
+### Test LIVE Health Route
+GET https://pawcare-api.onrender.com/api/health
+
+### Register a Regular User on LIVE Server
+POST https://pawcare-api.onrender.com/api/auth/register
+Content-Type: application/json
+
+{
+  "name": "cindy",
+  "email": "cindy@pawcare.com",
+  "password": "password123",
+  "role": "User"
+}
+
+### Test LIVE Vet Dashboard Bookings
+GET https://pawcare-api.onrender.com/api/bookings/vet
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5Y2U0ZmI3MjAyNzBkYmNmZGEyOTcwZCIsInJvbGUiOiJWZXQiLCJpYXQiOjE3NzUyMTYyMjcsImV4cCI6MTc3NTgyMTAyN30.LO22Jke0QpLNXmWtGwcL9OBLEBn7nqzdHkHvz0mr9aA
+
+
+
+### Register a Groomer
+POST https://pawcare-api.onrender.com/api/auth/register
+Content-Type: application/json
+
+{
+  "name": "Gary the Groomer",
+  "email": "groomer@pawcare.com",
+  "password": "password123",
+  "role": "Groomer"
+}
+
+###
+
+### Register a Pet Sitter
+POST https://pawcare-api.onrender.com/api/auth/register
+Content-Type: application/json
+
+{
+  "name": "Sally the Sitter",
+  "email": "sitter@pawcare.com",
+  "password": "password123",
+  "role": "BoardingManager"
+}
+
+###
+
+### Register a Shop Owner
+POST https://pawcare-api.onrender.com/api/auth/register
+Content-Type: application/json
+
+{
+  "name": "Oliver the Owner",
+  "email": "shop@pawcare.com",
+  "password": "password123",
+  "role": "ShopOwner"
+}
+
+
+### Register the Admin
+POST https://pawcare-api.onrender.com/api/auth/register
+Content-Type: application/json
+
+{
+  "name": "Super Admin",
+  "email": "admin@pawcare.com",
+  "password": "password123",
+  "role": "Admin"
+}
