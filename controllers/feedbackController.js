@@ -26,7 +26,7 @@ const getAllFeedback = async (req, res) => {
       query.serviceType = serviceType;
     }
     
-    const feedbacks = await Feedback.find(query);
+    const feedbacks = await Feedback.find(query).populate('userId', 'name').sort({ createdAt: -1 });
     res.status(200).json(feedbacks);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -66,6 +66,11 @@ const updateFeedback = async (req, res) => {
       return res.status(403).json({ message: 'Not authorized to update this feedback' });
     }
     
+    const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+    if (Date.now() - feedback.createdAt.getTime() > THREE_DAYS_MS) {
+      return res.status(403).json({ message: 'Edit window of 3 days has expired' });
+    }
+    
     feedback.rating = rating !== undefined ? rating : feedback.rating;
     feedback.comment = comment !== undefined ? comment : feedback.comment;
     
@@ -85,6 +90,15 @@ const deleteFeedback = async (req, res) => {
     
     if (!feedback) {
       return res.status(404).json({ message: 'Feedback not found' });
+    }
+    
+    if (req.user.role !== 'Admin' && feedback.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized to delete this feedback' });
+    }
+    
+    const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+    if (req.user.role !== 'Admin' && (Date.now() - feedback.createdAt.getTime() > THREE_DAYS_MS)) {
+      return res.status(403).json({ message: 'Delete window of 3 days has expired' });
     }
     
     await Feedback.findByIdAndDelete(id);

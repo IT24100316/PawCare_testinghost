@@ -10,6 +10,6 @@ router.post('/', submitFeedback);
 router.get('/', getAllFeedback);
 router.get('/average', getAverageRatings);
 router.put('/:id', updateFeedback);
-router.delete('/:id', authorizeRoles('Admin'), deleteFeedback);
+router.delete('/:id', deleteFeedback);
 
 module.exports = router;
