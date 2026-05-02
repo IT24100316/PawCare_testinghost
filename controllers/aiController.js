@@ -6,12 +6,12 @@ const analyzeSymptoms = async (req, res) => {
       return res.status(400).json({ message: 'Please describe the symptoms' });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
-      return res.status(500).json({ message: 'AI service is not configured. Please add GEMINI_API_KEY to .env' });
+      return res.status(500).json({ message: 'AI service is not configured. Please add GROQ_API_KEY to .env' });
     }
 
-    const systemPrompt = `You are a professional Veterinary Triage Assistant for a pet care app called PawCare. 
+    const systemPrompt = `You are a professional Veterinary Triage Assistant for a pet care app called PawCare.
 Your job is to help pet owners understand their pet's symptoms — NOT to diagnose.
 
 Rules:
@@ -20,66 +20,63 @@ Rules:
 - Never prescribe medication.
 - If the situation sounds life-threatening, urge them to visit a vet IMMEDIATELY.
 
-Respond in this EXACT JSON format (no markdown, no code fences, just raw JSON):
+You MUST respond with ONLY a valid JSON object. No markdown, no code fences, no extra text. Just raw JSON in this exact format:
 {
   "possibleConditions": ["condition 1", "condition 2"],
-  "urgencyLevel": <number from 1 to 10>,
-  "urgencyLabel": "<Low|Medium|High|Emergency>",
-  "recommendation": "<a short, caring recommendation>",
+  "urgencyLevel": 5,
+  "urgencyLabel": "Medium",
+  "recommendation": "a short caring recommendation",
   "homeCare": ["tip 1", "tip 2"],
-  "shouldSeeVet": <true or false>,
-  "vetTimeframe": "<e.g. Within 24 hours, Within a week, Immediately, Not urgent>"
-}`;
+  "shouldSeeVet": true,
+  "vetTimeframe": "Within 24 hours"
+}
+
+urgencyLabel must be exactly one of: Low, Medium, High, Emergency`;
 
     const userPrompt = `Pet Name: ${petName || 'Unknown'}
 Pet Type: ${petSpecies || 'Unknown'}
 Owner's Description: "${symptoms}"
 
-Analyze these symptoms and respond with the JSON format specified.`;
+Analyze these symptoms and respond with ONLY the JSON object specified. No other text.`;
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-
-    const response = await fetch(geminiUrl, {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
       body: JSON.stringify({
-        contents: [
-          { role: 'user', parts: [{ text: systemPrompt + '\n\n' + userPrompt }] },
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
         ],
-        generationConfig: {
-          temperature: 0.3,
-          maxOutputTokens: 1024,
-        },
+        temperature: 0.3,
+        max_tokens: 1024,
       }),
     });
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error('--- GEMINI API ERROR ---');
-      console.error('Status:', response.status);
-      console.error('Error Details:', JSON.stringify(errorData, null, 2));
-      console.error('------------------------');
-      
+      console.error('Groq API error:', response.status, JSON.stringify(errorData, null, 2));
       const errorMessage = errorData.error?.message || 'AI service error';
       return res.status(502).json({ message: `AI Error: ${errorMessage}` });
     }
 
-
     const data = await response.json();
 
-    // Extract the text from Gemini's response
-    const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    // Extract text from Groq's OpenAI-compatible response
+    const rawText = data?.choices?.[0]?.message?.content;
     if (!rawText) {
       return res.status(502).json({ message: 'AI returned an empty response. Please try again.' });
     }
 
-    // Parse the JSON from the AI response (strip any markdown fences if present)
+    // Strip any markdown fences if present
     const cleaned = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     let parsed;
     try {
       parsed = JSON.parse(cleaned);
     } catch {
-      // If JSON parsing fails, return the raw text as a fallback
       parsed = {
         possibleConditions: ['Unable to parse structured response'],
         urgencyLevel: 5,
