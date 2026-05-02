@@ -36,7 +36,16 @@ const getAvailableSlots = async (req, res) => {
     const bookedOrLockedSlots = activeBookings.map(b => b.timeSlot);
     
     const availableSlots = standardSlots
-      .filter(slot => !bookedOrLockedSlots.includes(slot))
+      .filter(slot => {
+        // If the slot is in bookedOrLockedSlots, it might still be "available" to the current user
+        // if they are the ones who locked it.
+        const booking = activeBookings.find(b => b.timeSlot === slot);
+        if (booking && booking.status === 'Pending' && !booking.petId) {
+            // It's a lock. If it's OUR lock, show it as available.
+            return booking.userId.toString() === req.user._id.toString();
+        }
+        return !bookedOrLockedSlots.includes(slot);
+      })
       .map(slot => ({
         time: slot
       }));
@@ -73,6 +82,12 @@ const lockSlot = async (req, res) => {
     });
 
     if (existingBooking) {
+      // If it's already locked by the SAME user, just update the lock and return it.
+      if (existingBooking.status === 'Pending' && !existingBooking.petId && existingBooking.userId.toString() === req.user._id.toString()) {
+        existingBooking.lockedUntil = new Date(Date.now() + 5 * 60 * 1000);
+        await existingBooking.save();
+        return res.status(200).json({ bookingId: existingBooking._id });
+      }
       return res.status(400).json({ message: 'Slot is already booked or locked' });
     }
 
