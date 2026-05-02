@@ -37,7 +37,7 @@ Owner's Description: "${symptoms}"
 
 Analyze these symptoms and respond with the JSON format specified.`;
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
     const response = await fetch(geminiUrl, {
       method: 'POST',
@@ -55,9 +55,15 @@ Analyze these symptoms and respond with the JSON format specified.`;
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error('Gemini API error:', response.status, errorData);
-      return res.status(502).json({ message: 'AI service returned an error. Please try again later.' });
+      console.error('--- GEMINI API ERROR ---');
+      console.error('Status:', response.status);
+      console.error('Error Details:', JSON.stringify(errorData, null, 2));
+      console.error('------------------------');
+      
+      const errorMessage = errorData.error?.message || 'AI service error';
+      return res.status(502).json({ message: `AI Error: ${errorMessage}` });
     }
+
 
     const data = await response.json();
 
