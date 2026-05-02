@@ -95,7 +95,7 @@ const lockSlot = async (req, res) => {
 
 const confirmBooking = async (req, res) => {
   try {
-    const { bookingId, petId } = req.body;
+    const { bookingId, petId, symptoms } = req.body;
 
     if (!bookingId || !petId) {
       return res.status(400).json({ message: 'bookingId and petId are required' });
@@ -116,6 +116,7 @@ const confirmBooking = async (req, res) => {
     }
 
     booking.petId = petId;
+    booking.symptoms = symptoms;
     booking.lockedUntil = undefined;
     booking.status = 'Pending';
 

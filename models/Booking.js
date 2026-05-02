@@ -56,6 +56,9 @@ const bookingSchema = new mongoose.Schema({
   notes: {
     type: String, // Special instructions from user
   },
+  symptoms: {
+    type: String, // Pre-visit symptoms/concerns
+  },
 }, {
   timestamps: true
 });
