@@ -16,6 +16,7 @@ const adminRoutes = require('./routes/adminRoutes');
 const userRoutes = require('./routes/userRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const aiRoutes = require('./routes/aiRoutes');
+const chatRoutes = require('./routes/chatRoutes');
 
 // Load environment variables
 dotenv.config();
@@ -52,6 +53,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/upload/image', uploadRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/chats', chatRoutes);
 
 const PORT = process.env.PORT || 5000;
 

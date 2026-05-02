@@ -52,4 +52,14 @@ const changePassword = async (req, res) => {
   }
 };
 
-module.exports = { getProfile, updateProfile, changePassword };
+const getVetUser = async (req, res) => {
+  try {
+    const vet = await User.findOne({ role: 'Vet' }).select('_id name');
+    if (!vet) return res.status(404).json({ message: 'Vet not found' });
+    res.status(200).json(vet);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+module.exports = { getProfile, updateProfile, changePassword, getVetUser };
