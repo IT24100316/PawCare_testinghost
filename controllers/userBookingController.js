@@ -11,4 +11,14 @@ const getMyBookings = async (req, res) => {
   }
 };
 
-module.exports = { getMyBookings };
+const getBookingById = async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id).populate('petId');
+    if (!booking) return res.status(404).json({ message: 'Booking not found' });
+    res.status(200).json(booking);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+module.exports = { getMyBookings, getBookingById };

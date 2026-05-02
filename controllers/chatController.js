@@ -6,6 +6,13 @@ const sendMessage = async (req, res) => {
     const { bookingId, receiver, text } = req.body;
     const sender = req.user._id;
 
+    const booking = await Booking.findById(bookingId);
+    if (!booking) return res.status(404).json({ message: 'Booking not found' });
+    
+    if (booking.status !== 'Approved') {
+      return res.status(403).json({ message: 'Chat is disabled for this booking status' });
+    }
+
     const message = await Message.create({
       bookingId,
       sender,
