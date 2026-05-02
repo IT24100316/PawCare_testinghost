@@ -35,6 +35,27 @@ const bookingSchema = new mongoose.Schema({
   lockedUntil: {
     type: Date,
   },
+  // Grooming-specific fields
+  subService: {
+    type: String, // e.g. "Full Groom", "Bath & Brush"
+  },
+  price: {
+    type: Number,
+  },
+  addOns: {
+    type: [String], // e.g. ["Nail Trimming", "Ear Cleaning"]
+    default: undefined,
+  },
+  petMood: {
+    type: String,
+    enum: ['Calm', 'Nervous', 'Aggressive'],
+  },
+  lastGroomingDate: {
+    type: Date,
+  },
+  notes: {
+    type: String, // Special instructions from user
+  },
 }, {
   timestamps: true
 });

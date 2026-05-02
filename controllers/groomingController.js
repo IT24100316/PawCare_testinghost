@@ -84,7 +84,7 @@ const lockSlot = async (req, res) => {
 
 const confirmBooking = async (req, res) => {
   try {
-    const { bookingId, petId } = req.body;
+    const { bookingId, petId, subService, price, addOns, petMood, lastGroomingDate, notes } = req.body;
     if (!bookingId || !petId) return res.status(400).json({ message: 'bookingId and petId are required' });
 
     const booking = await Booking.findById(bookingId);
@@ -98,7 +98,12 @@ const confirmBooking = async (req, res) => {
     booking.petId = petId;
     booking.lockedUntil = undefined;
     booking.status = 'Pending';
-    // Removed isInstantSlot assignment to preserve its state
+    if (subService)       booking.subService       = subService;
+    if (price != null)    booking.price            = price;
+    if (addOns)           booking.addOns           = addOns;
+    if (petMood)          booking.petMood          = petMood;
+    if (lastGroomingDate) booking.lastGroomingDate = new Date(lastGroomingDate);
+    if (notes)            booking.notes            = notes;
     await booking.save();
 
     const { sendNotification } = require('../utils/notificationService');
@@ -109,6 +114,31 @@ const confirmBooking = async (req, res) => {
     );
 
     res.status(200).json({ message: 'Booking confirmed', booking });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Users can edit their booking only while it is still Pending
+const updateBooking = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { subService, price, addOns, petMood, lastGroomingDate, notes } = req.body;
+
+    const booking = await Booking.findById(id);
+    if (!booking) return res.status(404).json({ message: 'Booking not found' });
+    if (booking.userId.toString() !== req.user._id.toString()) return res.status(403).json({ message: 'Unauthorized' });
+    if (booking.status !== 'Pending') return res.status(400).json({ message: 'Cannot edit a booking that has already been approved or rejected.' });
+
+    if (subService != null)      booking.subService       = subService;
+    if (price != null)           booking.price            = price;
+    if (addOns != null)          booking.addOns           = addOns;
+    if (petMood != null)         booking.petMood          = petMood;
+    if (lastGroomingDate != null) booking.lastGroomingDate = new Date(lastGroomingDate);
+    if (notes != null)           booking.notes            = notes;
+    await booking.save();
+
+    res.status(200).json({ message: 'Booking updated', booking });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -180,4 +210,4 @@ const updateBookingStatus = async (req, res) => {
   }
 };
 
-module.exports = { getAvailableSlots, lockSlot, confirmBooking, cancelBooking, getAllGroomingBookings, updateBookingStatus };
+module.exports = { getAvailableSlots, lockSlot, confirmBooking, cancelBooking, getAllGroomingBookings, updateBookingStatus, updateBooking };
